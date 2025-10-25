@@ -124,4 +124,70 @@ export class AuthService {
     } catch { /* ignore invalid token */ }
     return { ok: true };
   }
+
+  async oauthLogin(profile: {
+  provider: string;
+  providerAccountId: string;
+  email?: string;
+  displayName?: string;
+  avatar?: string;
+  accessToken?: string;
+  refreshToken?: string;
+}) {
+  // 1) Account đã từng đăng nhập?
+  const existingAccount = await this.prisma.account.findUnique({
+    where: {
+      provider_providerAccountId: {
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+      },
+    },
+  });
+
+  let userId: string;
+
+  if (existingAccount) {
+    userId = existingAccount.userId;
+    // Optional: cập nhật access/refresh từ provider
+    await this.prisma.account.update({
+      where: { id: existingAccount.id },
+      data: {
+        accessToken: profile.accessToken,
+        refreshToken: profile.refreshToken,
+      },
+    });
+  } else {
+    // 2) Chưa có account này: tìm user theo email (nếu có), không có thì tạo user placeholder
+    let user = profile.email ? await this.users.findByEmail(profile.email) : null;
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: profile.email ?? `${profile.provider}-${profile.providerAccountId}@placeholder.local`,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatar,
+          emailVerified: profile.email ? new Date() : null,
+        },
+      });
+    }
+
+    userId = user.id;
+
+    // 3) Tạo Account mapping provider ↔ user
+    await this.prisma.account.create({
+      data: {
+        userId,
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+        accessToken: profile.accessToken,
+        refreshToken: profile.refreshToken,
+      },
+    });
+  }
+
+  // 4) Phát JWT như thường
+  const user = await this.prisma.user.findUnique({ where: { id: userId } });
+  return this['issueTokensFor'](userId, user!.email, null);
+}
+
 }

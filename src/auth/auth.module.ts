@@ -8,9 +8,13 @@ import { PrismaModule } from '../prisma.module';
 import { MailModule } from '../mail/mail.module';
 import { OtpService } from './otp.service';
 
+import { GoogleStrategy } from './oauth/google.strategy';
+import { FacebookStrategy } from './oauth/facebook.strategy';
+import { OauthController } from './oauth.controller';
+
 @Module({
   imports: [UsersModule, PrismaModule, MailModule, JwtModule.register({})],
-  controllers: [AuthController],
-  providers: [AuthService, TokensService, OtpService],
+  controllers: [AuthController, OauthController],
+  providers: [AuthService, TokensService, OtpService, GoogleStrategy, FacebookStrategy],
 })
 export class AuthModule {}
