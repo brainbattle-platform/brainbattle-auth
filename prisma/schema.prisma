@@ -16,4 +16,21 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  refreshHash String // hash của refresh token hiện tại
+  userAgent   String?
+  ip          String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  expiresAt   DateTime
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
