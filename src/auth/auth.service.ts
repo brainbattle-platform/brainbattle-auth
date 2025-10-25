@@ -3,6 +3,8 @@ import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma.service';
 import * as argon2 from 'argon2';
 import { TokensService } from './tokens.service';
+import { MailService } from '../mail/mail.service';
+import { OtpService } from './otp.service';
 
 @Injectable()
 export class AuthService {
@@ -10,7 +12,42 @@ export class AuthService {
     private users: UsersService,
     private prisma: PrismaService,
     private tokens: TokensService,
-  ) {}
+    private mail: MailService,
+    private otp: OtpService,
+  ) { }
+
+  async registerStart(email: string) {
+    // Nếu email đã tồn tại (đã có password) thì chặn
+    const exists = await this.users.findByEmail(email);
+    if (exists && exists.passwordHash) throw new BadRequestException('Email already registered');
+
+    const { code, expiresAt } = await this.otp.createOrResend(email, 'register');
+    await this.mail.sendOtp(email, code);
+    return { ok: true, expiresAt };
+  }
+
+  async registerVerify(email: string, otp: string, password: string, displayName?: string) {
+    await this.otp.verify(email, 'register', otp);
+
+    // Nếu user chưa có -> tạo; nếu đã có (do đăng ký dở dang) -> cập nhật password
+    const existing = await this.users.findByEmail(email);
+    const passwordHash = await argon2.hash(password);
+
+    let userId: string;
+    if (!existing) {
+      const user = await this.users.createWithPassword(email, passwordHash, displayName);
+      userId = user.id;
+    } else {
+      const user = await this.prisma.user.update({
+        where: { id: existing.id }, data: { passwordHash, displayName }
+      });
+      userId = user.id;
+    }
+
+    // Auto login -> issue tokens
+    const tokens = await this['issueTokensFor'](userId, email, null);
+    return tokens;
+  }
 
   async register(email: string, password: string, displayName?: string) {
     const exists = await this.users.findByEmail(email);
@@ -35,7 +72,7 @@ export class AuthService {
         userId,
         refreshHash: 'temp',     // set tạm, sẽ update sau để không lộ plaintext
         userAgent: userAgent ?? undefined,
-        expiresAt: new Date(Date.now() + (parseInt(process.env.JWT_REFRESH_TTL ?? '2592000',10) * 1000)),
+        expiresAt: new Date(Date.now() + (parseInt(process.env.JWT_REFRESH_TTL ?? '2592000', 10) * 1000)),
       },
     });
 
@@ -48,7 +85,7 @@ export class AuthService {
     });
 
     const accessToken = this.tokens.signAccessToken({ id: userId, email });
-    return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: parseInt(process.env.JWT_ACCESS_TTL ?? '900',10) };
+    return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: parseInt(process.env.JWT_ACCESS_TTL ?? '900', 10) };
   }
 
   async refresh(refreshToken: string) {
@@ -74,7 +111,7 @@ export class AuthService {
       ?? await this.prisma.user.findUnique({ where: { id: payload.sub } });
 
     const accessToken = this.tokens.signAccessToken({ id: user!.id, email: user!.email });
-    return { accessToken, refreshToken: newRefresh, tokenType: 'Bearer', expiresIn: parseInt(process.env.JWT_ACCESS_TTL ?? '900',10) };
+    return { accessToken, refreshToken: newRefresh, tokenType: 'Bearer', expiresIn: parseInt(process.env.JWT_ACCESS_TTL ?? '900', 10) };
   }
 
   async logout(refreshToken: string) {

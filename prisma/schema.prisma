@@ -34,3 +34,13 @@ model Session {
 
   @@index([userId])
 }
+
+model EmailOtp {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  codeHash  String
+  purpose   String   // "register"
+  expiresAt DateTime
+  resendAt  DateTime
+  createdAt DateTime @default(now())
+}
