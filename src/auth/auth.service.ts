@@ -126,68 +126,128 @@ export class AuthService {
   }
 
   async oauthLogin(profile: {
-  provider: string;
-  providerAccountId: string;
-  email?: string;
-  displayName?: string;
-  avatar?: string;
-  accessToken?: string;
-  refreshToken?: string;
-}) {
-  // 1) Account đã từng đăng nhập?
-  const existingAccount = await this.prisma.account.findUnique({
-    where: {
-      provider_providerAccountId: {
-        provider: profile.provider,
-        providerAccountId: profile.providerAccountId,
-      },
-    },
-  });
-
-  let userId: string;
-
-  if (existingAccount) {
-    userId = existingAccount.userId;
-    // Optional: cập nhật access/refresh từ provider
-    await this.prisma.account.update({
-      where: { id: existingAccount.id },
-      data: {
-        accessToken: profile.accessToken,
-        refreshToken: profile.refreshToken,
+    provider: string;
+    providerAccountId: string;
+    email?: string;
+    displayName?: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+  }) {
+    // 1) Account đã từng đăng nhập?
+    const existingAccount = await this.prisma.account.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: profile.provider,
+          providerAccountId: profile.providerAccountId,
+        },
       },
     });
-  } else {
-    // 2) Chưa có account này: tìm user theo email (nếu có), không có thì tạo user placeholder
-    let user = profile.email ? await this.users.findByEmail(profile.email) : null;
 
-    if (!user) {
-      user = await this.prisma.user.create({
+    let userId: string;
+
+    if (existingAccount) {
+      userId = existingAccount.userId;
+      // Optional: cập nhật access/refresh từ provider
+      await this.prisma.account.update({
+        where: { id: existingAccount.id },
         data: {
-          email: profile.email ?? `${profile.provider}-${profile.providerAccountId}@placeholder.local`,
-          displayName: profile.displayName,
-          avatarUrl: profile.avatar,
-          emailVerified: profile.email ? new Date() : null,
+          accessToken: profile.accessToken,
+          refreshToken: profile.refreshToken,
+        },
+      });
+    } else {
+      // 2) Chưa có account này: tìm user theo email (nếu có), không có thì tạo user placeholder
+      let user = profile.email ? await this.users.findByEmail(profile.email) : null;
+
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            email: profile.email ?? `${profile.provider}-${profile.providerAccountId}@placeholder.local`,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatar,
+            emailVerified: profile.email ? new Date() : null,
+          },
+        });
+      }
+
+      userId = user.id;
+
+      // 3) Tạo Account mapping provider ↔ user
+      await this.prisma.account.create({
+        data: {
+          userId,
+          provider: profile.provider,
+          providerAccountId: profile.providerAccountId,
+          accessToken: profile.accessToken,
+          refreshToken: profile.refreshToken,
         },
       });
     }
 
-    userId = user.id;
-
-    // 3) Tạo Account mapping provider ↔ user
-    await this.prisma.account.create({
-      data: {
-        userId,
-        provider: profile.provider,
-        providerAccountId: profile.providerAccountId,
-        accessToken: profile.accessToken,
-        refreshToken: profile.refreshToken,
-      },
-    });
+    // 4) Phát JWT như thường
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    return this['issueTokensFor'](userId, user!.email, null);
   }
 
-  // 4) Phát JWT như thường
-  const user = await this.prisma.user.findUnique({ where: { id: userId } });
-  return this['issueTokensFor'](userId, user!.email, null);
-}
+  async forgotStart(email: string) {
+    // Chỉ cho reset nếu user tồn tại và có password truyền thống
+    const user = await this.users.findByEmail(email);
+    if (!user || !user.passwordHash) {
+      // Mềm mại: không lộ thông tin tài khoản tồn tại hay không
+      return { ok: true }; 
+    }
 
+    const { code, expiresAt } = await this.otp.createOrResend(email, 'reset');
+    await this.mail.sendOtp(email, code);
+    return { ok: true, expiresAt };
+  }
+
+  async forgotVerify(email: string, otp: string, newPassword: string) {
+    // Xác minh OTP
+    await this.otp.verify(email, 'reset', otp);
+
+    const user = await this.users.findByEmail(email);
+    if (!user || !user.passwordHash) {
+      // Nếu là account OAuth-only (không có password) → có thể convert thành password login mới
+      // hoặc trả lỗi — ở đây mình cho phép đặt password luôn:
+      const passwordHash = await argon2.hash(newPassword);
+      let userId: string;
+
+      if (!user) {
+        const created = await this.users.createWithPassword(email, passwordHash, undefined);
+        userId = created.id;
+      } else {
+        const updated = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { passwordHash },
+        });
+        userId = updated.id;
+      }
+
+      // Revoke toàn bộ session cũ (nếu có) rồi cấp token mới
+      await this.prisma.session.updateMany({
+        where: { userId },
+        data: { revokedAt: new Date() },
+      });
+
+      return this.issueTokensFor(userId, email, null);
+    }
+
+    // Người dùng có password → cập nhật
+    const passwordHash = await argon2.hash(newPassword);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Revoke toàn bộ session cũ
+    await this.prisma.session.updateMany({
+      where: { userId: user.id },
+      data: { revokedAt: new Date() },
+    });
+
+    // Auto-login sau khi reset để UX tốt
+    return this.issueTokensFor(user.id, user.email, null);
+  }
 }
