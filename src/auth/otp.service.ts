@@ -1,10 +1,13 @@
+// src/auth/otp.service.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import * as argon2 from 'argon2';
 
 function randomDigits(n: number) {
-  return Array.from({length: n}, () => Math.floor(Math.random() * 10)).join('');
+  return Array.from({ length: n }, () => Math.floor(Math.random() * 10)).join('');
 }
+
+type OtpPurpose = 'register' | 'reset';
 
 @Injectable()
 export class OtpService {
@@ -14,7 +17,7 @@ export class OtpService {
 
   constructor(private prisma: PrismaService) {}
 
-  async createOrResend(email: string, purpose: 'register') {
+  async createOrResend(email: string, purpose: OtpPurpose) {
     const now = Date.now();
     const existing = await this.prisma.emailOtp.findUnique({ where: { email } });
 
@@ -41,7 +44,7 @@ export class OtpService {
     return { code, expiresAt };
   }
 
-  async verify(email: string, purpose: 'register', code: string) {
+  async verify(email: string, purpose: OtpPurpose, code: string) {
     const rec = await this.prisma.emailOtp.findUnique({ where: { email } });
     if (!rec || rec.purpose !== purpose) throw new BadRequestException('OTP not found');
     if (rec.expiresAt < new Date()) throw new BadRequestException('OTP expired');

@@ -16,7 +16,7 @@ model Account {
   refreshToken      String?
   expiresAt         Int?
 
-  user              User    @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -33,7 +33,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   sessions Session[]
-  accounts      Account[]
+  accounts Account[]
 }
 
 model Session {
@@ -55,7 +55,7 @@ model EmailOtp {
   id        String   @id @default(cuid())
   email     String   @unique
   codeHash  String
-  purpose   String   // "register"
+  purpose   String // "register"
   expiresAt DateTime
   resendAt  DateTime
   createdAt DateTime @default(now())
