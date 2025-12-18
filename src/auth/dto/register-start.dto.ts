@@ -1,2 +1,6 @@
-import { IsEmail } from 'class-validator';
-export class RegisterStartDto { @IsEmail() email!: string; }
+import { ApiProperty } from '@nestjs/swagger';
+
+export class RegisterStartDto {
+  @ApiProperty({ example: 'user@mail.com' })
+  email: string;
+}

@@ -1,6 +1,6 @@
-import { IsEmail } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ForgotStartDto {
-  @IsEmail()
-  email!: string;
+  @ApiProperty({ example: 'user@mail.com' })
+  email: string;
 }

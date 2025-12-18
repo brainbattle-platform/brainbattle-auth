@@ -1,4 +1,3 @@
-// src/auth/otp.service.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import * as argon2 from 'argon2';
