@@ -1,10 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('System')
 @Controller('.well-known')
 export class JwksController {
-  // Tối thiểu 1 key. Sau này có rotate thì trả thêm key với "kid" khác.
   @Get('jwks.json')
-  getJwks() {
+  @ApiOperation({ summary: 'Public JWKS endpoint' })
+  jwks() {
     return {
       keys: [
         {

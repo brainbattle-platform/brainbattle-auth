@@ -1,13 +1,12 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ForgotVerifyDto {
-  @IsEmail()
-  email!: string;
+  @ApiProperty({ example: 'user@mail.com' })
+  email: string;
 
-  @IsString()
-  otp!: string;
+  @ApiProperty({ example: '123456' })
+  otp: string;
 
-  @IsString()
-  @MinLength(8)
-  newPassword!: string;
+  @ApiProperty({ example: 'NewStrongPassword123' })
+  newPassword: string;
 }

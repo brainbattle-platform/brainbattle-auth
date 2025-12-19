@@ -1,9 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
-@Controller()
+@ApiTags('System')
+@Controller('health')
 export class HealthController {
   @Get()
-  ping() {
-    return { ok: true, service: 'brainbattle-auth' };
+  @ApiOperation({ summary: 'Health check' })
+  health() {
+    return { status: 'ok' };
   }
 }
