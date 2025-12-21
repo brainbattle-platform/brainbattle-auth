@@ -4,24 +4,17 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class MailService {
   private transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST!,
+    host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true', // false => STARTTLS
+    secure: false, // STARTTLS
     auth: {
-      user: process.env.SMTP_USER!,
-      pass: process.env.SMTP_PASS!,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
     },
-    tls:
-      process.env.SMTP_TLS_INSECURE === 'true'
-        ? { rejectUnauthorized: false } // ⚠️ chỉ dùng tạm để test khi bị proxy SSL
-        : { servername: process.env.SMTP_HOST! },
   });
 
   async sendOtp(email: string, code: string) {
     try {
-      // optional verify SMTP connection
-      await this.transporter.verify();
-
       const html = `
         <div style="font-family:Arial,Helvetica,sans-serif">
           <h2>BrainBattle - Email Verification</h2>
@@ -34,7 +27,7 @@ export class MailService {
       `;
 
       await this.transporter.sendMail({
-        from: process.env.MAIL_FROM || `"BrainBattle" <no-reply@brainbattle.app>`,
+        from: process.env.MAIL_FROM,
         to: email,
         subject: 'BrainBattle - Verify your email',
         html,
@@ -42,7 +35,7 @@ export class MailService {
 
       console.log(`[MAIL] Sent OTP to ${email}`);
     } catch (err: any) {
-      console.error('[MAIL] sendOtp error:', err?.message || err);
+      console.error('[MAIL] sendOtp error:', err);
       throw new ServiceUnavailableException('Email service unavailable');
     }
   }

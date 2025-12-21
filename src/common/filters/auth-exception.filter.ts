@@ -12,14 +12,13 @@ export class AuthExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse();
 
+    console.error('AUTH EXCEPTION:', exception);
+
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const response = exception.getResponse();
 
-      if (
-        typeof response === 'object' &&
-        (response as any).error?.code
-      ) {
+      if (typeof response === 'object') {
         return res.status(status).json({
           statusCode: status,
           ...(response as object),
@@ -29,7 +28,7 @@ export class AuthExceptionFilter implements ExceptionFilter {
       return res.status(status).json({
         statusCode: status,
         error: {
-          code: 'AUTH_INTERNAL_ERROR',
+          code: 'AUTH_ERROR',
           message: exception.message,
         },
       });

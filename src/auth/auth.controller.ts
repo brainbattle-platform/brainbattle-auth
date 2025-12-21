@@ -4,23 +4,30 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiBody,        // 👈 THÊM DÒNG NÀY
+
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterStartDto } from './dto/register-start.dto';
 import { RegisterVerifyDto } from './dto/register-verify.dto';
 import { ForgotStartDto } from './dto/forgot-start.dto';
 import { ForgotVerifyDto } from './dto/forgot-verify.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
+
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly auth: AuthService) { }
 
   @Post('register/start')
-  @ApiOperation({ summary: 'Start register (send OTP)' })
   registerStart(@Body() dto: RegisterStartDto) {
+    console.log('REGISTER START DTO:', dto);
     return this.auth.registerStart(dto.email);
   }
+
 
   @Post('register/verify')
   @ApiOperation({ summary: 'Verify OTP & create account' })
@@ -47,32 +54,21 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Login with email & password' })
-  @ApiResponse({
-    status: 200,
-    description: 'Auth tokens',
-    schema: {
-      example: {
-        accessToken: 'jwt',
-        refreshToken: 'jwt',
-        expiresIn: 900,
-        user: { id: 'uuid' },
-      },
-    },
-  })
-  login(@Body() body: { email: string; password: string }) {
-    return this.auth.login(body.email, body.password);
+  @ApiBody({ type: LoginDto }) // 👈 DÒNG QUYẾT ĐỊNH
+  login(@Body() dto: LoginDto) {
+    return this.auth.login(dto.email, dto.password);
   }
 
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  refresh(@Body() body: { refreshToken: string }) {
-    return this.auth.refresh(body.refreshToken);
+  refresh(@Body() dto: RefreshDto) {
+    return this.auth.refresh(dto.refreshToken);
   }
 
   @Post('logout')
   @ApiOperation({ summary: 'Logout & revoke refresh token' })
-  logout(@Body() body: { refreshToken: string }) {
-    return this.auth.logout(body.refreshToken);
+  logout(@Body() dto: LogoutDto) {
+    return this.auth.logout(dto.refreshToken);
   }
 
   @Post('forgot/start')
@@ -84,6 +80,10 @@ export class AuthController {
   @Post('forgot/verify')
   @ApiOperation({ summary: 'Verify OTP & reset password' })
   forgotVerify(@Body() dto: ForgotVerifyDto) {
-    return this.auth.forgotVerify(dto.email, dto.otp, dto.newPassword);
+    return this.auth.forgotVerify(
+      dto.email,
+      dto.otp,
+      dto.newPassword,
+    );
   }
 }

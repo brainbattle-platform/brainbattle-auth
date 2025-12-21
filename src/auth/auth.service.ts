@@ -26,20 +26,34 @@ export class AuthService {
     private readonly otp: OtpService,
   ) {}
 
-  
-  async registerStart(email: string) {
+  async registerStart(email?: string) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+
     const exists = await this.users.findByEmail(email);
     if (exists && exists.passwordHash) {
       throw new BadRequestException('Email already registered');
     }
 
     const { code, expiresAt } = await this.otp.createOrResend(email, 'register');
-    await this.mail.sendOtp(email, code);
+
+    try {
+      await this.mail.sendOtp(email, code);
+    } catch (e) {
+      console.error('MAIL ERROR', e);
+      throw new BadRequestException('Failed to send OTP email');
+    }
 
     return { ok: true, expiresAt };
   }
 
-  async registerVerify(email: string, otp: string, password: string, displayName?: string): Promise<AuthResponse> {
+  async registerVerify(
+    email: string,
+    otp: string,
+    password: string,
+    displayName?: string,
+  ): Promise<AuthResponse> {
     await this.otp.verify(email, 'register', otp);
 
     const existing = await this.users.findByEmail(email);
@@ -48,12 +62,17 @@ export class AuthService {
     let userId: string;
 
     if (!existing) {
-      const user = await this.users.createWithPassword(email, passwordHash, displayName);
+      const user = await this.users.createWithPassword(
+        email,
+        passwordHash,
+        displayName,
+        new Date(),
+      );
       userId = user.id;
     } else {
       const user = await this.prisma.user.update({
         where: { id: existing.id },
-        data: { passwordHash, displayName },
+        data: { passwordHash, displayName, emailVerified: new Date() },
       });
       userId = user.id;
     }
@@ -61,6 +80,7 @@ export class AuthService {
     return this.issueTokensFor(userId, null);
   }
 
+  // (Giữ lại nếu bạn vẫn dùng endpoint /auth/register kiểu cũ)
   async register(email: string, password: string, displayName?: string): Promise<AuthResponse> {
     const exists = await this.users.findByEmail(email);
     if (exists) throw new BadRequestException('Email already registered');
@@ -71,7 +91,6 @@ export class AuthService {
     return this.issueTokensFor(user.id, null);
   }
 
-
   async login(email: string, password: string): Promise<AuthResponse> {
     const user = await this.users.findByEmail(email);
     if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
@@ -81,7 +100,6 @@ export class AuthService {
 
     return this.issueTokensFor(user.id, null);
   }
-
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
     const payload = this.tokens.verifyRefresh(refreshToken); // { sid, sub }
@@ -125,7 +143,7 @@ export class AuthService {
     return { ok: true };
   }
 
-
+  // ✅ OAuth login (GIỮ NGUYÊN như bạn)
   async oauthLogin(profile: {
     provider: string;
     providerAccountId: string;
@@ -186,14 +204,21 @@ export class AuthService {
     return this.issueTokensFor(userId, null);
   }
 
-
   async forgotStart(email: string) {
     const user = await this.users.findByEmail(email);
 
+    // không leak user tồn tại hay không
     if (!user || !user.passwordHash) return { ok: true };
 
     const { code, expiresAt } = await this.otp.createOrResend(email, 'reset');
-    await this.mail.sendOtp(email, code);
+
+    try {
+      await this.mail.sendOtp(email, code);
+    } catch (e) {
+      console.error('MAIL ERROR', e);
+      // vẫn trả ok để không leak + không làm client fail vì mail provider tạm thời
+      return { ok: true };
+    }
 
     return { ok: true, expiresAt };
   }
@@ -224,7 +249,6 @@ export class AuthService {
 
     return this.issueTokensFor(userId, null);
   }
-
 
   private async issueTokensFor(userId: string, userAgent: string | null): Promise<AuthResponse> {
     const session = await this.prisma.session.create({
