@@ -13,9 +13,7 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# ==========================
-# RUNTIME STAGE
-# ==========================
+
 FROM node:20
 WORKDIR /app
 
@@ -25,7 +23,6 @@ RUN npm install --omit=dev
 COPY prisma ./prisma
 COPY --from=build /app/dist ./dist
 
-# 🔴 BẮT BUỘC: generate lại trong runtime image
 RUN npx prisma generate
 
 EXPOSE 3000

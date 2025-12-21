@@ -6,11 +6,18 @@ import { AuthExceptionFilter } from './common/filters/auth-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
   app.enableCors();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: false, 
+    }),
+  );
+
   app.useGlobalFilters(new AuthExceptionFilter());
-  await app.listen(3000);
-  console.log('✅ Server running on http://localhost:3000');
 
   const config = new DocumentBuilder()
     .setTitle('BrainBattle Auth API')
@@ -28,7 +35,9 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('/docs', app, document);
+
+  await app.listen(3000);
+  console.log('Swagger running at http://localhost:4001/docs');
 }
+
 bootstrap();
-
-
