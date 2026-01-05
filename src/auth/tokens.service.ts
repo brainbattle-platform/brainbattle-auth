@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import * as jwt from 'jsonwebtoken';
 
 function fromBase64(b64?: string) {
   return b64 ? Buffer.from(b64, 'base64').toString('utf8') : '';
@@ -25,7 +25,7 @@ export class TokensService {
   private readonly privateKey = fromBase64(process.env.JWT_PRIVATE_KEY_BASE64);
   private readonly publicKey = fromBase64(process.env.JWT_PUBLIC_KEY_BASE64);
 
-  constructor(private readonly jwt: JwtService) {}
+  constructor() {}
 
   signAccessToken(user: { id: string; roles?: string[] }) {
     const payload: AccessTokenPayload = {
@@ -33,19 +33,18 @@ export class TokensService {
       roles: user.roles ?? ['USER'],
     };
 
-    return this.jwt.sign(payload, {
+    return jwt.sign(payload, this.privateKey, {
       algorithm: 'RS256',
-      privateKey: this.privateKey,
       expiresIn: this.accessTtl,
       issuer: this.issuer,
       audience: this.audience,
+      keyid: process.env.JWT_KID,
     });
   }
 
   verifyAccess(token: string): AccessTokenPayload {
-    return this.jwt.verify(token, {
+    return jwt.verify(token, this.publicKey, {
       algorithms: ['RS256'],
-      publicKey: this.publicKey,
       issuer: this.issuer,
       audience: this.audience,
     }) as AccessTokenPayload;
@@ -57,19 +56,18 @@ export class TokensService {
       sid: payload.sessionId,
     };
 
-    return this.jwt.sign(refreshPayload, {
+    return jwt.sign(refreshPayload, this.privateKey, {
       algorithm: 'RS256',
-      privateKey: this.privateKey,
       expiresIn: this.refreshTtl,
       issuer: this.issuer,
       audience: this.audience,
+      keyid: process.env.JWT_KID,
     });
   }
 
   verifyRefresh(token: string): RefreshTokenPayload {
-    return this.jwt.verify(token, {
+    return jwt.verify(token, this.publicKey, {
       algorithms: ['RS256'],
-      publicKey: this.publicKey,
       issuer: this.issuer,
       audience: this.audience,
     }) as RefreshTokenPayload;
