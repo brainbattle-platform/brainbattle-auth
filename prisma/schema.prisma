@@ -23,17 +23,24 @@ model Account {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String    @id @default(uuid())
+  username      String?   @unique
   email         String    @unique
   passwordHash  String?
   displayName   String?
-  avatarUrl     String?
+  bio           String?
+  avatarUrl     String?   // URL trỏ tới MinIO object
+  rankCode      String    @default("BRONZE")
+  status        String    @default("ACTIVE") // ACTIVE | BANNED
+  role          String    @default("USER")   // USER | ADMIN
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   sessions Session[]
   accounts Account[]
+
+  @@index([username])
 }
 
 model Session {

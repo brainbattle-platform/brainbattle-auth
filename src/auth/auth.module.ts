@@ -12,9 +12,21 @@ import { GoogleStrategy } from './oauth/google.strategy';
 import { FacebookStrategy } from './oauth/facebook.strategy';
 import { OauthController } from './oauth.controller';
 
+import { SimpleAuthService } from './simple-auth.service';
+import { SimpleAuthController } from './simple-auth.controller';
+
 @Module({
   imports: [UsersModule, PrismaModule, MailModule, JwtModule.register({})],
-  controllers: [AuthController, OauthController],
-  providers: [AuthService, TokensService, OtpService, GoogleStrategy, FacebookStrategy],
+  controllers: [AuthController, OauthController, SimpleAuthController],
+  providers: [
+    AuthService,
+    TokensService,
+    OtpService,
+    SimpleAuthService,
+    // OAuth strategies will check env vars in constructor and log warnings if missing
+    // They will still be registered but won't work without proper credentials
+    //GoogleStrategy,
+    //FacebookStrategy,
+  ],
 })
 export class AuthModule {}

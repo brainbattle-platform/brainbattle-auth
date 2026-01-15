@@ -31,6 +31,41 @@ Supports **email sign-up with OTP**, **password-based login**, **Google/Facebook
 
 ---
 
+## 🚀 Setup
+
+### Database Configuration
+
+The auth service uses PostgreSQL. When running with Docker Compose from `brainbattle-infra`:
+
+**DATABASE_URL** should point to the `auth-db` service:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@auth-db:5432/brainbattle_auth
+```
+
+For local development (outside Docker), use:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/brainbattle_auth
+```
+
+> **Note**: `auth-db` runs on port `5433` (host) → `5432` (container) in `brainbattle-infra/docker-compose.yml`
+
+### Running Migrations
+
+```bash
+# Generate Prisma Client
+npm run prisma:generate
+
+# Run migrations
+npm run prisma:migrate
+
+# Seed database (optional)
+npx prisma db seed
+```
+
+---
+
 ## 🗃️ Proposed Database (Prisma models)
 
 - `User` — profile (id, email, name, avatar, …)

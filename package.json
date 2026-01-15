@@ -17,7 +17,12 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:format": "prisma format"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.9",
@@ -27,8 +32,10 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.9",
     "@nestjs/swagger": "^11.2.3",
+    "@aws-sdk/client-s3": "^3.700.0",
     "@prisma/client": "^6.18.0",
     "argon2": "^0.44.0",
+    "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "jose": "^5.2.4",
@@ -52,8 +59,10 @@
     "@nestjs/testing": "^11.0.1",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^1.4.12",
     "@types/node": "^22.10.7",
     "@types/passport-facebook": "^3.0.4",
+    "@types/bcrypt": "^5.0.2",
     "@types/supertest": "^6.0.2",
     "cross-env": "^10.1.0",
     "eslint": "^9.18.0",
@@ -88,5 +97,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }
