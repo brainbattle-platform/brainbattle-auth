@@ -10,7 +10,11 @@ type AuthResponse = {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
-  user: { id: string };
+  data: {
+    userId: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
 };
 
 @Injectable()
@@ -59,25 +63,23 @@ export class AuthService {
     const existing = await this.users.findByEmail(email);
     const passwordHash = await argon2.hash(password);
 
-    let userId: string;
+    let user;
 
     if (!existing) {
-      const user = await this.users.createWithPassword(
+      user = await this.users.createWithPassword(
         email,
         passwordHash,
         displayName,
         new Date(),
       );
-      userId = user.id;
     } else {
-      const user = await this.prisma.user.update({
+      user = await this.prisma.user.update({
         where: { id: existing.id },
         data: { passwordHash, displayName, emailVerified: new Date() },
       });
-      userId = user.id;
     }
 
-    return this.issueTokensFor(userId, null);
+    return this.issueTokensFor(user.id, user);
   }
 
   // (Giữ lại nếu bạn vẫn dùng endpoint /auth/register kiểu cũ)
@@ -88,17 +90,21 @@ export class AuthService {
     const hash = await argon2.hash(password);
     const user = await this.users.createWithPassword(email, hash, displayName);
 
-    return this.issueTokensFor(user.id, null);
+    return this.issueTokensFor(user.id, user);
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
     const user = await this.users.findByEmail(email);
-    if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
 
     const ok = await argon2.verify(user.passwordHash, password);
-    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    if (!ok) {
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
 
-    return this.issueTokensFor(user.id, null);
+    return this.issueTokensFor(user.id, user);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
@@ -121,12 +127,17 @@ export class AuthService {
     });
 
     const accessToken = this.tokens.signAccessToken({ id: payload.sub });
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
 
     return {
       accessToken,
       refreshToken: newRefresh,
       expiresIn: this.accessTtl,
-      user: { id: payload.sub },
+      data: {
+        userId: payload.sub,
+        displayName: user?.displayName ?? null,
+        avatarUrl: user?.avatarUrl ?? null,
+      },
     };
   }
 
@@ -162,10 +173,10 @@ export class AuthService {
       },
     });
 
-    let userId: string;
+    let user;
 
     if (existingAccount) {
-      userId = existingAccount.userId;
+      const userId = existingAccount.userId;
 
       await this.prisma.account.update({
         where: { id: existingAccount.id },
@@ -174,11 +185,13 @@ export class AuthService {
           refreshToken: profile.refreshToken,
         },
       });
-    } else {
-      let user = profile.email ? await this.users.findByEmail(profile.email) : null;
 
-      if (!user) {
-        user = await this.prisma.user.create({
+      user = await this.prisma.user.findUnique({ where: { id: userId } });
+    } else {
+      let existingUser = profile.email ? await this.users.findByEmail(profile.email) : null;
+
+      if (!existingUser) {
+        existingUser = await this.prisma.user.create({
           data: {
             email: profile.email ?? `${profile.provider}-${profile.providerAccountId}@placeholder.local`,
             displayName: profile.displayName,
@@ -188,7 +201,7 @@ export class AuthService {
         });
       }
 
-      userId = user.id;
+      const userId = existingUser.id;
 
       await this.prisma.account.create({
         data: {
@@ -199,9 +212,11 @@ export class AuthService {
           refreshToken: profile.refreshToken,
         },
       });
+
+      user = existingUser;
     }
 
-    return this.issueTokensFor(userId, null);
+    return this.issueTokensFor(user.id, user);
   }
 
   async forgotStart(email: string) {
@@ -229,33 +244,33 @@ export class AuthService {
     const user = await this.users.findByEmail(email);
     const passwordHash = await argon2.hash(newPassword);
 
-    let userId: string;
+    let updatedUser;
 
     if (!user) {
       const created = await this.users.createWithPassword(email, passwordHash, undefined);
-      userId = created.id;
+      updatedUser = created;
     } else {
       const updated = await this.prisma.user.update({
         where: { id: user.id },
         data: { passwordHash },
       });
-      userId = updated.id;
+      updatedUser = updated;
     }
 
     await this.prisma.session.updateMany({
-      where: { userId },
+      where: { userId: updatedUser.id },
       data: { revokedAt: new Date() },
     });
 
-    return this.issueTokensFor(userId, null);
+    return this.issueTokensFor(updatedUser.id, updatedUser);
   }
 
-  private async issueTokensFor(userId: string, userAgent: string | null): Promise<AuthResponse> {
+  private async issueTokensFor(userId: string, user: any): Promise<AuthResponse> {
     const session = await this.prisma.session.create({
       data: {
         userId,
         refreshHash: 'temp',
-        userAgent: userAgent ?? undefined,
+        userAgent: null,
         expiresAt: new Date(Date.now() + this.refreshTtl * 1000),
       },
     });
@@ -270,11 +285,20 @@ export class AuthService {
 
     const accessToken = this.tokens.signAccessToken({ id: userId });
 
+    // Fetch full user data if not provided
+    if (!user) {
+      user = await this.prisma.user.findUnique({ where: { id: userId } });
+    }
+
     return {
       accessToken,
       refreshToken,
       expiresIn: this.accessTtl,
-      user: { id: userId },
+      data: {
+        userId,
+        displayName: user?.displayName ?? null,
+        avatarUrl: user?.avatarUrl ?? null,
+      },
     };
   }
 }

@@ -1,13 +1,13 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseFilters } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
-  ApiBody,        
-
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { AuthExceptionFilter } from '../common/filters/auth-exception.filter';
 import { RegisterStartDto } from './dto/register-start.dto';
 import { RegisterVerifyDto } from './dto/register-verify.dto';
 import { ForgotStartDto } from './dto/forgot-start.dto';
@@ -16,9 +16,9 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
 
-
 @ApiTags('Auth')
 @Controller('auth')
+@UseFilters(AuthExceptionFilter)
 export class AuthController {
   constructor(private readonly auth: AuthService) { }
 
@@ -33,13 +33,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify OTP & create account' })
   @ApiResponse({
     status: 200,
-    description: 'Auth tokens',
+    description: 'Auth tokens with user data',
     schema: {
       example: {
-        accessToken: 'jwt',
-        refreshToken: 'jwt',
+        accessToken: 'jwt...',
+        refreshToken: 'jwt...',
         expiresIn: 900,
-        user: { id: 'uuid' },
+        data: {
+          userId: 'uuid',
+          displayName: 'John Doe',
+          avatarUrl: 'https://example.com/avatar.png',
+        },
       },
     },
   })
@@ -54,7 +58,36 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Login with email & password' })
-  @ApiBody({ type: LoginDto }) // 👈 DÒNG QUYẾT ĐỊNH
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Auth tokens with user data',
+    schema: {
+      example: {
+        accessToken: 'jwt...',
+        refreshToken: 'jwt...',
+        expiresIn: 900,
+        data: {
+          userId: 'uuid',
+          displayName: 'John Doe',
+          avatarUrl: 'https://example.com/avatar.png',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials',
+    schema: {
+      example: {
+        error: {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid credentials',
+          details: null,
+        },
+      },
+    },
+  })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto.email, dto.password);
   }
