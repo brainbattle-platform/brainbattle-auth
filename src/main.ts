@@ -23,7 +23,17 @@ async function bootstrap() {
     .setTitle('BrainBattle Identity API')
     .setDescription('Identity/Profile service backed by Supabase Auth')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+        name: 'Authorization',
+        description: 'Supabase access token',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
