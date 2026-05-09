@@ -1,124 +1,89 @@
-# BrainBattle Auth Service
+# BrainBattle — Auth Context Service
 
-Custom **authentication microservice** for the BrainBattle app, built with **NestJS**.
-Supports **email sign-up with OTP**, **password-based login**, **Google/Facebook OAuth2**,
-**forgot/reset password**, **refresh token rotation** with revoke, and **logout**.
+Overview
 
----
-
-## ✨ Features
-
-- Email registration flow: **request OTP → verify OTP → set password**
-- Password login (email + password)
-- **Google** & **Facebook** OAuth2 login / connect
-- Forgot password → email link/token → reset password
-- **JWT** authentication:
-  - **Access token** (default: 15m)
-  - **Refresh token** (default: 30d) with **rotation + revoke**
-- Account session management & logout (single device or all devices)
-- Secure mail delivery via real SMTP server (already available)
-- Rate limiting, CORS, Helmet, and robust validation (class-validator)
+This service verifies Supabase access tokens and exposes an identity endpoint used by other services. It does not implement full signup/login flows; it provides authenticated user context (profile, roles, learner_profile) via Prisma.
 
 ---
 
-## 🧱 Tech Stack
+Architecture / Flow
 
-- **NestJS** (REST) + **Passport** strategies (JWT, Google, Facebook)
-- **Prisma** ORM + **PostgreSQL**
-- **JWT RS256** (public/private keys)
-- **Nodemailer** for SMTP
-- Optional: **Docker Compose** for local dev
+- Token verification: `src/auth-context/services/supabase-auth.service.ts` (Supabase client)
+- Guard: `src/auth-context/guards/supabase-auth.guard.ts` (validates Bearer token and populates `req.user`)
+- Controller: `src/auth-context/auth.controller.ts` — `GET /auth/me` (reads `profile`, `userRole`, `learnerProfile` from database via Prisma)
+- Database: Prisma ORM with `prisma/schema.prisma` (datasource from `DATABASE_URL`)
 
 ---
 
-## 🚀 Setup
+Project structure (important parts)
 
-### Database Configuration
+- `src/` — application source
+  - `auth-context/` — auth-related controller, guard, services
+  - `prisma.module.ts`, `prisma.service.ts` — Prisma integration
+  - other modules: `profiles/`, `roles/`, `wallets/`, `learner-profiles/`, `admin-users/`
+- `prisma/` — schema and migrations
+- `scripts/` — helper scripts (e.g. `scripts/get-token.js`)
+- `docker-compose.yml` — local PostgreSQL service (exposes host port 5433)
 
-The auth service uses PostgreSQL. When running with Docker Compose from `brainbattle-infra`:
+---
 
-**DATABASE_URL** should point to the `auth-db` service:
+Installation & Run
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@auth-db:5432/brainbattle_auth
-```
+Requirements
 
-For local development (outside Docker), use:
+- Node.js 18+ and npm
+- PostgreSQL (accessible via `DATABASE_URL`) or use the included Docker Compose for a local DB
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/brainbattle_auth
-```
-
-> **Note**: `auth-db` runs on port `5433` (host) → `5432` (container) in `brainbattle-infra/docker-compose.yml`
-
-### Running Migrations
+Quick start (development)
 
 ```bash
-# Generate Prisma Client
+npm install
+cp .env.example .env
+docker compose up -d         # optional: starts local Postgres on port 5433
 npm run prisma:generate
+npm run prisma:migrate       # run migrations for local dev if needed
+npm run start:dev
+```
 
-# Run migrations
-npm run prisma:migrate
+Production build
 
-# Seed database (optional)
-npx prisma db seed
+```bash
+npm run build
+npm run start
 ```
 
 ---
 
-## 🗃️ Proposed Database (Prisma models)
+Environment variables (key)
 
-- `User` — profile (id, email, name, avatar, …)
-- `UserCredential` — password hash, password version, userId (1–1)
-- `UserProvider` — OAuth links (provider, providerUserId, userId)
-- `OtpCode` — email OTP (code, purpose, expiresAt, attempts…)
-- `RefreshSession` — hashed refresh token, userId, device info, revokedAt
-- (Optional) `AuditLog` for security events
+- `PORT` — application port (default: 3000)
+- `DATABASE_URL` — Prisma datasource URL (Postgres)
+- `SUPABASE_URL` — Supabase project URL
+- `SUPABASE_ANON_KEY` — Supabase anon key (used by Supabase client)
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (optional)
+- `NODE_ENV` — environment
 
-> Tách OTP và Refresh Session giúp audit & bảo mật rõ ràng, dễ revoke.
-
----
-
-## 🔐 Token Policy (default)
-
-- `ACCESS_TOKEN_TTL=900s` (15 phút)
-- `REFRESH_TOKEN_TTL=30d`
-- **Rotation**: mỗi lần refresh sinh token mới và **revoke** token cũ
-- **RS256**: ký bằng `JWT_PRIVATE_KEY`, verify bằng `JWT_PUBLIC_KEY`
-- JWT claims: `sub` (userId), `email`, `roles`, `iat`, `exp`, `iss`, `aud`
+See `.env.example` for a template.
 
 ---
 
-## 📡 API Endpoints
+Important scripts
 
-> Prefix gợi ý: `/auth`
-
-### Email & Password
-- `POST /auth/register/request-otp` — `{ email }` → gửi OTP
-- `POST /auth/register/verify-otp` — `{ email, otp }` → token tạm `register_token`
-- `POST /auth/register/set-password` — `{ register_token, password }` → tạo tài khoản
-- `POST /auth/login` — `{ email, password }` → `{ access_token, refresh_token }`
-- `POST /auth/forgot-password` — `{ email }` → gửi mail đặt lại mật khẩu
-- `POST /auth/reset-password` — `{ reset_token, new_password }`
-- `POST /auth/logout` — Headers: `Authorization: Bearer <access>`; Body: `{ allDevices?: boolean }`
-- `POST /auth/refresh` — `{ refresh_token }` → rotate
-- `GET  /auth/me` — trả user info (yêu cầu access token)
-
-### OAuth (Google/Facebook)
-- `GET  /auth/google` → OAuth init (redirect)
-- `GET  /auth/google/callback` → nhận code, login/attach, trả tokens
-- `GET  /auth/facebook` → OAuth init (redirect)
-- `GET  /auth/facebook/callback` → nhận code, login/attach, trả tokens
-
-> Tuỳ FE/mobile, có thể dùng **PKCE + OAuth on backend** hoặc **one-tap** (Google).
+- `npm run start:dev` — start NestJS in watch mode
+- `npm run start` — start production (built) app
+- `npm run build` — compile TypeScript
+- `npm run prisma:generate` / `prisma:migrate` / `prisma:studio` — Prisma tooling
 
 ---
 
-## 🧩 Request/Response Samples
+Dependencies / External services
 
-**Register – request OTP**
-```http
-POST /auth/register/request-otp
-Content-Type: application/json
+- Primary runtime dependencies used by code: Supabase (token verification) and PostgreSQL (Prisma)
+- Other packages are present in `package.json` (Passport, Nodemailer, OAuth providers), but not all are actively used by the `auth-context` controller.
 
-{ "email": "user@example.com" }
+---
+
+Notes
+
+- The codebase contains additional documentation in the `docs/` folder describing broader auth flows; not all described flows are implemented in `src/`.
+- Keep `.env` values up-to-date before running migrations or the server.

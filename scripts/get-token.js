@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function main() {
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: 'ngochannt1904@gmail.com',
+    email: '23520434@gm.uit.edu.vn',
     password: '@123456789',
   });
 
