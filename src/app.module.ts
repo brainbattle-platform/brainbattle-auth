@@ -7,7 +7,7 @@ import { LearnerProfilesModule } from './learner-profiles/learner-profiles.modul
 import { RolesModule } from './roles/roles.module';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { WalletsModule } from './wallets/wallets.module';
-
+import { InternalModule } from './internal/internal.module';
 @Module({
   imports: [
     PrismaModule,
@@ -17,6 +17,7 @@ import { WalletsModule } from './wallets/wallets.module';
     RolesModule,
     AdminUsersModule,
     WalletsModule,
+    InternalModule,
   ],
   controllers: [HealthController],
 })
