@@ -1,9 +1,12 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 export class UpdateMyProfileDto {
   @IsOptional()
   @IsString()
   @MaxLength(50)
+  @Matches(/^[a-zA-Z0-9._]+$/, {
+    message: 'username can only contain letters, numbers, dots and underscores',
+  })
   username?: string;
 
   @IsOptional()

@@ -23,9 +23,11 @@ export class UpdateLearnerProfileDto {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   focus_skills?: string[];
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   weak_skills?: string[];
 }
