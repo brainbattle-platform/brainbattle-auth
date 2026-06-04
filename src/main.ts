@@ -4,10 +4,17 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AuthExceptionFilter } from './common/filters/auth-exception.filter';
 import { PrismaService } from './prisma.service';
-import { env } from './config/env';
+import { env, validateEnv } from './config/env';
 
 async function bootstrap() {
+  validateEnv();
+
   const app = await NestFactory.create(AppModule);
+
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -37,12 +44,19 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   const prismaService = app.get(PrismaService);
   await prismaService.enableShutdownHooks(app);
 
-  await app.listen(env.port);
+  await app.listen(env.port, '0.0.0.0');
+
+  console.log(`BrainBattle Auth API running at http://localhost:${env.port}/docs`);
 }
 
 bootstrap();
