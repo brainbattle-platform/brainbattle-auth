@@ -100,18 +100,32 @@ model UserRole {
 }
 
 model LearnerProfile {
-  userId              String   @id @map("user_id") @db.Uuid
-  goalType            String?  @map("goal_type")
-  currentLevel        String?  @map("current_level")
-  targetLevel         String?  @map("target_level")
-  nativeLanguage      String?  @map("native_language")
-  targetLanguage      String?  @map("target_language")
-  focusSkills         Json?    @map("focus_skills")
-  weakSkills          Json?    @map("weak_skills")
-  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  authUser            AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId              String    @id @map("user_id") @db.Uuid
+  goalType            String?   @map("goal_type")
+  currentLevel        String?   @map("current_level")
+  targetLevel         String?   @map("target_level")
+  nativeLanguage      String?   @map("native_language")
+  targetLanguage      String?   @map("target_language")
+  focusSkills         Json?     @map("focus_skills")
+  weakSkills          Json?     @map("weak_skills")
+  onboardingCompleted Boolean   @default(false) @map("onboarding_completed")
+
+  rankTier            String?   @map("rank_tier")
+  rankStars           Int?      @map("rank_stars")
+  seasonId            String?   @map("season_id")
+  winCount            Int?      @map("win_count")
+  drawCount           Int?      @map("draw_count")
+  loseCount           Int?      @map("lose_count")
+  totalBattles        Int?      @map("total_battles")
+  brainPointBalance   Int?      @map("brain_point_balance")
+
+  walletAddress       String?   @map("wallet_address")
+  walletVerifiedAt    DateTime? @map("wallet_verified_at") @db.Timestamptz(6)
+  walletProvider      String?   @map("wallet_provider")
+
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  authUser            AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("learner_profiles")
   @@schema("public")
@@ -140,6 +154,7 @@ model WalletLink {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   authUser      AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@unique([userId, walletAddress, chain], map: "uq_wallet_links_user_wallet_chain")
   @@map("wallet_links")
   @@schema("public")
 }
