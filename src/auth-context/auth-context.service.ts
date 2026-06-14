@@ -140,6 +140,7 @@ export class AuthContextService {
     }
 
     const roleNames = roles.map((item) => item.role as AppRole);
+    const primaryWallet = wallets.find((wallet) => wallet.isPrimary) ?? wallets[0] ?? null;
 
     return {
       user_id: user.id,
@@ -190,13 +191,40 @@ export class AuthContextService {
           }
         : null,
 
+      primary_wallet: primaryWallet
+        ? {
+            id: primaryWallet.id,
+            wallet_address: primaryWallet.walletAddress,
+            walletAddress: primaryWallet.walletAddress,
+            address: primaryWallet.walletAddress,
+            chain: primaryWallet.chain,
+            is_primary: primaryWallet.isPrimary,
+            isPrimary: primaryWallet.isPrimary,
+            verified_at: primaryWallet.verifiedAt,
+            verifiedAt: primaryWallet.verifiedAt,
+            created_at: primaryWallet.createdAt,
+            createdAt: primaryWallet.createdAt,
+          }
+        : null,
+      wallet_address: primaryWallet?.walletAddress ?? null,
+      walletAddress: primaryWallet?.walletAddress ?? null,
+      wallet_provider: primaryWallet?.chain ?? learnerProfile?.walletProvider ?? null,
+      walletProvider: primaryWallet?.chain ?? learnerProfile?.walletProvider ?? null,
+      wallet_verified_at: primaryWallet?.verifiedAt ?? learnerProfile?.walletVerifiedAt ?? null,
+      walletVerifiedAt: primaryWallet?.verifiedAt ?? learnerProfile?.walletVerifiedAt ?? null,
+
       wallets: wallets.map((wallet) => ({
         id: wallet.id,
         wallet_address: wallet.walletAddress,
+        walletAddress: wallet.walletAddress,
+        address: wallet.walletAddress,
         chain: wallet.chain,
         is_primary: wallet.isPrimary,
+        isPrimary: wallet.isPrimary,
         verified_at: wallet.verifiedAt,
+        verifiedAt: wallet.verifiedAt,
         created_at: wallet.createdAt,
+        createdAt: wallet.createdAt,
       })),
 
       needs_profile_setup: !profile?.username || !profile?.displayName,

@@ -88,65 +88,61 @@ export class InternalProfileService {
     const chain = dto.walletProvider ?? 'external';
     const verifiedAt = new Date();
 
-    const learnerProfile = await this.prisma.$transaction(async (tx) => {
-      await tx.walletLink.updateMany({
-        where: {
-          userId: dto.userId,
-          isPrimary: true,
-        },
-        data: {
-          isPrimary: false,
-        },
-      });
+    await this.prisma.walletLink.updateMany({
+      where: {
+        userId: dto.userId,
+        isPrimary: true,
+      },
+      data: {
+        isPrimary: false,
+      },
+    });
 
-      await tx.walletLink.upsert({
-        where: {
-          userId_walletAddress_chain: {
-            userId: dto.userId,
-            walletAddress: dto.walletAddress,
-            chain,
-          },
-        },
-        update: {
-          isPrimary: true,
-          verifiedAt,
-        },
-        create: {
+    await this.prisma.walletLink.upsert({
+      where: {
+        userId_walletAddress_chain: {
           userId: dto.userId,
           walletAddress: dto.walletAddress,
           chain,
-          isPrimary: true,
-          verifiedAt,
         },
-      });
+      },
+      update: {
+        isPrimary: true,
+        verifiedAt,
+      },
+      create: {
+        userId: dto.userId,
+        walletAddress: dto.walletAddress,
+        chain,
+        isPrimary: true,
+        verifiedAt,
+      },
+    });
 
-      const profile = await tx.learnerProfile.upsert({
-        where: { userId: dto.userId },
-        update: {
+    const learnerProfile = await this.prisma.learnerProfile.upsert({
+      where: { userId: dto.userId },
+      update: {
+        walletAddress: dto.walletAddress,
+        walletProvider: chain,
+        walletVerifiedAt: verifiedAt,
+      },
+      create: {
+        userId: dto.userId,
+        walletAddress: dto.walletAddress,
+        walletProvider: chain,
+        walletVerifiedAt: verifiedAt,
+      },
+    });
+
+    await this.prisma.userAuditEvent.create({
+      data: {
+        userId: dto.userId,
+        eventType: 'wallet.synced',
+        payload: {
           walletAddress: dto.walletAddress,
           walletProvider: chain,
-          walletVerifiedAt: verifiedAt,
         },
-        create: {
-          userId: dto.userId,
-          walletAddress: dto.walletAddress,
-          walletProvider: chain,
-          walletVerifiedAt: verifiedAt,
-        },
-      });
-
-      await tx.userAuditEvent.create({
-        data: {
-          userId: dto.userId,
-          eventType: 'wallet.synced',
-          payload: {
-            walletAddress: dto.walletAddress,
-            walletProvider: chain,
-          },
-        },
-      });
-
-      return profile;
+      },
     });
 
     return {
@@ -160,6 +156,22 @@ export class InternalProfileService {
   }
 
   async getWallet(userId: string) {
+    const primaryWallet = await this.prisma.walletLink.findFirst({
+      where: { userId, isPrimary: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (primaryWallet) {
+      return {
+        userId,
+        walletAddress: primaryWallet.walletAddress,
+        walletVerifiedAt: primaryWallet.verifiedAt?.toISOString() ?? null,
+        walletProvider: primaryWallet.chain,
+        chain: primaryWallet.chain,
+        isPrimary: primaryWallet.isPrimary,
+      };
+    }
+
     const learnerProfile = await this.prisma.learnerProfile.findUnique({
       where: { userId },
       select: {
@@ -179,6 +191,8 @@ export class InternalProfileService {
       walletAddress: learnerProfile.walletAddress,
       walletVerifiedAt: learnerProfile.walletVerifiedAt?.toISOString() ?? null,
       walletProvider: learnerProfile.walletProvider,
+      chain: learnerProfile.walletProvider,
+      isPrimary: Boolean(learnerProfile.walletAddress),
     };
   }
 
